@@ -7,4 +7,4 @@ Graphics are provided be Kenney at www.kenney.nl
 
 Music is provided by Eric Matyas at www.soundimage.org
 
-![SCREENSHOT](/Untitled-Rougelike/Assets/screenshot.png?raw=true "ScreenShot")
+![SCREENSHOT](https://github.com/mechatronic3000/Untitled-Rougelike/blob/main/Assets/screenshot.png)
