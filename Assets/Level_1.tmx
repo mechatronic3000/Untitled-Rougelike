@@ -68,7 +68,7 @@
     <property name="TILE_OPEN" type="int" value="540"/>
    </properties>
   </object>
-  <object id="28" name="senMUSIC_3" type="SENSOR" x="832" y="928" width="336" height="320"/>
+  <object id="28" name="senMUSIC_2" type="SENSOR" x="832" y="928" width="336" height="320"/>
  </objectgroup>
  <objectgroup id="3" name="Collision"/>
  <layer id="5" name="Tile Collision" width="128" height="128">
