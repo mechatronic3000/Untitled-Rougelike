@@ -110,7 +110,7 @@ SUB main
   STATIC engine AS tENGINE
 
   _TITLE "Untitled Rougelike Adventure"
-  engine.logFileName = _CWD$ + "/Logfile.txt"
+  engine.logFileName = _CWD$ + OSPathJoin$ + "Logfile.txt"
   engine.logFileNumber = 1
   logfile = engine.logFileNumber
   IF _FILEEXISTS(engine.logFileName) THEN KILL engine.logFileName
@@ -175,8 +175,8 @@ SUB buildScene (engine AS tENGINE, world AS tWORLD, entity() AS tENTITY, gamemap
   '********************************************************
   '   Load Map
   '********************************************************
-  XMLparse _CWD$ + "/Assets/", engine.currentMap, context()
-  XMLApplyAttributes engine, world, gamemap(), entity(), poly(), body(), camera, tile(), tilemap, _CWD$ + "/Assets/", context()
+  XMLparse _CWD$ + OSPathJoin$ + "Assets" + OSPathJoin$, engine.currentMap, context()
+  XMLapplyAttributes engine, world, gamemap(), entity(), poly(), body(), camera, tile(), tilemap, _CWD$ + OSPathJoin$ + "Assets" + OSPathJoin$, context()
   initInputDevice poly(), body(), idevice, tile(idToTile(tile(), 516 + 1)).t
 
   DIM AS LONG playerId
@@ -263,7 +263,7 @@ SUB runScene (engine AS tENGINE, world AS tWORLD, entity() AS tENTITY, gamemap()
         removeAllMusic playList, sounds()
         engine.currentMap = trim$(tempDoor.map)
         XMLparse _CWD$ + "/Assets/", trim$(engine.currentMap), context()
-        XMLApplyAttributes engine, world, gamemap(), entity(), poly(), body(), camera, tile(), tilemap, _CWD$ + "/Assets/", context()
+        XMLapplyAttributes engine, world, gamemap(), entity(), poly(), body(), camera, tile(), tilemap, _CWD$ + "/Assets/", context()
         initInputDevice poly(), body(), iDevice, tile(idToTile(tile(), 516 + 1)).t
         playerId = entityManagerID(body(), "PLAYER")
         IF playerId < 0 THEN
@@ -349,7 +349,20 @@ SUB runScene (engine AS tENGINE, world AS tWORLD, entity() AS tENTITY, gamemap()
       END IF
 
       IF iDevice.b1PosEdge THEN
+        'isOnSensor returns the body ID of the sensor
+        DIM AS LONG volumeControlID
+        volumeControlID = entityManagerID(body(), "enVOLCONTROL")
         SELECT CASE isOnSensor(engine, mpos)
+          CASE bodyManagerID(body(), "senVolumeUp"):
+            IF gameOptions.musicVolume <= 1.0 THEN
+              gameOptions.musicVolume = gameOptions.musicVolume + 0.1
+              body(entity(volumeControlID).objectID).fzx.position.x = body(entity(volumeControlID).objectID).fzx.position.x + tilemap.tileWidth
+            END IF
+          CASE bodyManagerID(body(), "senVolumeDown"):
+            IF gameOptions.musicVolume >= 0.0 THEN
+              gameOptions.musicVolume = gameOptions.musicVolume - 0.1
+              body(entity(volumeControlID).objectID).fzx.position.x = body(entity(volumeControlID).objectID).fzx.position.x - tilemap.tileWidth
+            END IF
           CASE ELSE
             moveEntity entity(playerId), body(), iDevice.mouse, gamemap(), tilemap
             FSMChangeState camera.fsm, cFSM_CAMERA_IDLE
@@ -3724,7 +3737,7 @@ SUB XMLparse (dir AS STRING, file AS STRING, con() AS tSTRINGTUPLE)
   NEXT
 END SUB
 
-SUB XMLApplyAttributes (engine AS tENGINE, world AS tWORLD, gamemap() AS tTILE, entity() AS tENTITY, p() AS tPOLY, body() AS tBODY, camera AS tCAMERA, tile() AS tTILE, tilemap AS tTILEMAP, dir AS STRING, con() AS tSTRINGTUPLE)
+SUB XMLapplyAttributes (engine AS tENGINE, world AS tWORLD, gamemap() AS tTILE, entity() AS tENTITY, p() AS tPOLY, body() AS tBODY, camera AS tCAMERA, tile() AS tTILE, tilemap AS tTILEMAP, dir AS STRING, con() AS tSTRINGTUPLE)
   DIM AS STRING context, arg, elementName, elementString, objectGroupName, objectName, objectType, propertyName, propertyValueString, objectID, mapLayer, elementValueString
   DIM AS LONG index, firstId, start, comma, mapIndex, tempId, sensorImage, tempColor
   DIM AS tVECTOR2d o, tempVec
@@ -3817,6 +3830,12 @@ SUB XMLApplyAttributes (engine AS tENGINE, world AS tWORLD, gamemap() AS tTILE, 
                 yp = getXMLArgValue(arg, " y=") * tilemap.tilescale
                 vector2dSet tempVec, xp + tilemap.tileWidth, yp + tilemap.tileHeight
                 tempId = entityCreate(entity(), p(), body(), tilemap, objectName, tempVec)
+              CASE "ENTITY":
+                objectName = getXMLArgString$(arg, " name=")
+                xp = getXMLArgValue(arg, " x=") * tilemap.tilescale
+                yp = getXMLArgValue(arg, " y=") * tilemap.tilescale
+                vector2dSet tempVec, xp + tilemap.tileWidth, yp + tilemap.tileHeight
+                tempId = entityCreate(entity(), p(), body(), tilemap, objectName, tempVec)
               CASE "SENSOR":
                 objectName = getXMLArgString$(arg, " name=")
                 xp = getXMLArgValue(arg, " x=") * tilemap.tilescale
@@ -3904,6 +3923,14 @@ SUB XMLApplyAttributes (engine AS tENGINE, world AS tWORLD, gamemap() AS tTILE, 
                     entity(body(tempId).entityID).parameters.maxForce.y = propertyValue
                   CASE "NO_PHYSICS":
                     setBody p(), body(), cPARAMETER_NOPHYSICS, tempId, propertyValue, 0
+                END SELECT
+              CASE "ENTITY":
+                propertyName = getXMLArgString$(arg, " name=")
+                propertyValue = getXMLArgValue(arg, " value=")
+                tempId = bodyManagerID(body(), objectName)
+                SELECT CASE propertyName
+                  CASE "TileID":
+                    setBody p(), body(), cPARAMETER_TEXTURE, tempId, tile(idToTile(tile(), propertyValue + 1)).t, 0
                 END SELECT
               CASE "SENSOR": ' No properties
               CASE "WAYPOINT": ' No properties
@@ -4116,6 +4143,7 @@ SUB handleMusic (playlist AS tPLAYLIST, sounds() AS tSOUND)
       _SNDVOL sounds(playlist.currentMusic).handle, gameOptions.musicVolume * scalarLERPProgress##(playlist.fsm.timerState.start, playlist.fsm.timerState.start + playlist.fsm.timerState.duration)
       FSMChangeStateOnTimer playlist.fsm, cFSM_SOUND_PLAY
     CASE cFSM_SOUND_PLAY:
+      _SNDVOL sounds(playlist.currentMusic).handle, gameOptions.musicVolume
       IF playlist.currentMusic <> playlist.nextMusic AND playlist.nextMusic > -1 THEN
         FSMChangeState playlist.fsm, cFSM_SOUND_LEADOUT
       END IF
@@ -4257,4 +4285,23 @@ FUNCTION handleDoors& (entity() AS tENTITY, body() AS tBODY, hits() AS tHIT, doo
   NEXT
 END FUNCTION
 
+'**********************************************************************************************
+'     Operating System Related
+'**********************************************************************************************
+SUB _______________OS_CONSIDERATIONS (): END SUB
+
+FUNCTION OSPathJoin$
+  ' This can be easily optomized, however more cases may come up and I want
+  ' to be able to include those as well.
+  SELECT CASE _OS$
+    CASE "[WINDOWS]":
+      OSPathJoin$ = "\"
+    CASE "[LINUX]":
+      OSPathJoin$ = "/"
+    CASE "[MACOSX]":
+      OSPathJoin$ = "/"
+    CASE ELSE
+      OSPathJoin$ = "/"
+  END SELECT
+END FUNCTION
 
